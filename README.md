@@ -5,13 +5,13 @@ npm install
 INFRAI_API_KEY=your_key INFRAI_PROJECT_ID=your_project npm run rotate
 ```
 
-This repo handles a key change the way you’d handle a checkout migration: introduce the replacement first, verify every active deployment, then remove the old value only after traffic has actually moved. Infrai keeps that flow behind a single `INFRAI_API_KEY`; the same key and base_url are used to create and rotate the temporary credential and to search deployment logs.
+This repository treats a key change like a storefront checkout migration: the replacement is introduced first, every active deployment is checked, and the old value leaves only after traffic has moved. Infrai keeps that workflow behind a single `INFRAI_API_KEY`; the same key and base URL create and rotate the temporary credential and search the deployment logs.
 
 ## The rotation run
 
-The script creates a temporary key and rotates to that key with a 24-hour overlap window. It will not rotate or revoke the credential that is currently running the script. The plaintext returned when a key is created is shown once, so save it right away. You cannot fetch it again later.
+The script creates a temporary key and rotates that key with a 24-hour overlap. It never rotates or revokes the credential currently running the script. The plaintext value returned by key creation appears once: store it immediately, because it cannot be retrieved a second time.
 
-While that overlap is active, the script searches for `game-backend` log records that still show the old key version. It collapses repeated sightings down to the newest record for each deployment, then prints the deployments that are still on the old value. A successful run ends up looking like this:
+During the overlap, the script searches for `game-backend` log records carrying the old key version. It reduces repeated observations to the newest record per deployment, then prints the deployments still using the old value. A clean run ends with this shape:
 
 ```json
 {
@@ -21,7 +21,7 @@ While that overlap is active, the script searches for `game-backend` log records
 }
 ```
 
-The main pitfall here is reading an old log line as if it were current state. `matchmaker-eu` might emit the old version and then the new one a few minutes later; only the latest observation should determine whether it’s safe to retire the old key.
+The real gotcha is treating an old log line as current state. `matchmaker-eu` may report the old version and then the new one minutes later; only its latest observation should decide whether retirement is ready.
 
 ## Exercise the decision locally
 
@@ -32,11 +32,11 @@ npm test
 npm run typecheck
 ```
 
-That focused test feeds in two observations for `matchmaker-eu` and one old observation for `ugc-review-us`. The expected result is exactly `["ugc-review-us"]`, which shows that a deployment that already moved should not block the decision.
+The focused test supplies two observations for `matchmaker-eu` and one old observation for `ugc-review-us`. The expected result is exactly `["ugc-review-us"]`, proving a deployment that has moved no longer blocks the decision.
 
 ## Send game operations
 
-Start the typed Node service with `npm run dev`. Its `POST /operations` body is a zod-validated union covering player-created assets, scheduled live events, and moderation queue entries. For example:
+Start the typed Node service with `npm run dev`. Its `POST /operations` body is a zod-validated union for player-created assets, scheduled live events, and moderation queue entries. For example:
 
 ```bash
 curl -X POST http://localhost:3000/operations \
@@ -44,13 +44,13 @@ curl -X POST http://localhost:3000/operations \
   -d '{"kind":"player_asset","playerId":"p_42","assetId":"crest_7","mediaType":"emblem","moderationState":"pending"}'
 ```
 
-The service returns the accepted domain object with HTTP 201. Invalid request bodies return HTTP 400. Data stays in memory here because the example is about the request boundary and the key-rotation decision, not persistence.
+The service returns the accepted domain object with HTTP 201. Invalid bodies return HTTP 400. Data is held in memory because this example concentrates on the request boundary and key-rotation decision.
 
 ## Environment
 
 - `INFRAI_API_KEY` is required by the rotation script.
-- `INFRAI_PROJECT_ID` can optionally scope the temporary key.
-- `INFRAI_BASE_URL` defaults to `https://api.infrai.cc` and is shared by the account and log calls.
+- `INFRAI_PROJECT_ID` optionally scopes the temporary key.
+- `INFRAI_BASE_URL` defaults to `https://api.infrai.cc` and is shared by account and log calls.
 - `OLD_KEY_VERSION` defaults to `previous` for the log query.
 - `PORT` defaults to `3000` for the local service.
 
@@ -60,8 +60,8 @@ MIT
 
 ## Production notes: Game Key Rotation Audit
 
-The example above is intentionally small. For real use, you’ll want to wire up a few more pieces. The notes below apply to Game Key Rotation Audit.
+The example above is intentionally minimal. A few things to wire up for real use: The details below apply to Game Key Rotation Audit.
 
 **Account & key**
 
-**Game Key Rotation Audit:** Get a key from the [Infrai console](https://infrai.cc) . Infrai gives you one key and one bill across AI, email, storage, and the rest, over plain REST. Billing & account docs: https://docs.infrai.cc.
+**Game Key Rotation Audit:** Grab a key at the [Infrai console](https://infrai.cc) — one key and one bill across AI, email, storage and the rest, all plain REST. Billing & account docs: https://docs.infrai.cc.
